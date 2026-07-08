@@ -1,0 +1,112 @@
+{
+  "name": "on-sidebar",
+  "displayName": "Open Notebook 侧边栏",
+  "description": "通过 REST API 在 VS Code 中原生操作 Open Notebook。支持中文/英文，自动检测 Docker 环境。",
+  "version": "2.0.0",
+  "publisher": "local",
+  "engines": { "vscode": "^1.85.0" },
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Open Notebook",
+      "properties": {
+        "openNotebook.apiUrl": {
+          "type": "string",
+          "default": "http://localhost:5055",
+          "description": "Open Notebook API 地址 (含端口)"
+        },
+        "openNotebook.webUrl": {
+          "type": "string",
+          "default": "http://localhost:8502",
+          "description": "Open Notebook Web UI 地址"
+        },
+        "openNotebook.language": {
+          "type": "string",
+          "default": "zh-cn",
+          "enum": ["zh-cn", "en"],
+          "enumDescriptions": ["中文", "English"],
+          "description": "界面语言"
+        },
+        "openNotebook.autoStartDocker": {
+          "type": "boolean",
+          "default": false,
+          "description": "启动 VS Code 时自动启动 Docker 服务"
+        },
+        "openNotebook.dockerComposePath": {
+          "type": "string",
+          "default": "",
+          "description": "docker-compose.yml 所在目录路径（留空则自动检测）"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [{
+        "id": "openNotebook",
+        "title": "Open Notebook",
+        "icon": "$(notebook)"
+      }]
+    },
+    "views": {
+      "openNotebook": [{
+        "id": "onNotebooks",
+        "name": "笔记本",
+        "icon": "$(folder-library)"
+      }]
+    },
+    "commands": [
+      { "command": "on.refresh", "title": "刷新", "icon": "$(refresh)" },
+      { "command": "on.createNotebook", "title": "新建笔记本", "icon": "$(new-file)" },
+      { "command": "on.openNotebook", "title": "打开笔记本" },
+      { "command": "on.openSource", "title": "打开资料" },
+      { "command": "on.openNote", "title": "打开笔记" },
+      { "command": "on.openChat", "title": "AI 对话" },
+      { "command": "on.createSource", "title": "添加资料", "icon": "$(add)" },
+      { "command": "on.createNote", "title": "添加笔记", "icon": "$(note-add)" },
+      { "command": "on.deleteNotebook", "title": "删除笔记本" },
+      { "command": "on.search", "title": "搜索", "icon": "$(search)" },
+      { "command": "on.configureAI", "title": "配置 AI", "icon": "$(key)" },
+      { "command": "on.importCurrentFile", "title": "导入当前文件到笔记本", "icon": "$(cloud-upload)" },
+      { "command": "on.importFile", "title": "导入文件到笔记本" },
+      { "command": "on.importFileFromEditor", "title": "导入到 Open Notebook" },
+      { "command": "on.checkEnv", "title": "环境检测 & 自动构建", "icon": "$(debug-start)" },
+      { "command": "on.switchLang", "title": "切换语言", "icon": "$(globe)" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "on.refresh", "when": "view == onNotebooks", "group": "navigation" },
+        { "command": "on.createNotebook", "when": "view == onNotebooks", "group": "navigation" },
+        { "command": "on.search", "when": "view == onNotebooks", "group": "navigation" },
+        { "command": "on.configureAI", "when": "view == onNotebooks", "group": "navigation" },
+        { "command": "on.importCurrentFile", "when": "view == onNotebooks", "group": "navigation" },
+        { "command": "on.checkEnv", "when": "view == onNotebooks", "group": "navigation@99" },
+        { "command": "on.switchLang", "when": "view == onNotebooks", "group": "navigation@100" }
+      ],
+      "view/item/context": [
+        { "command": "on.openNotebook", "when": "viewItem == notebook", "group": "inline" },
+        { "command": "on.openChat", "when": "viewItem == notebook", "group": "context@1" },
+        { "command": "on.createSource", "when": "viewItem == notebook", "group": "context@2" },
+        { "command": "on.createNote", "when": "viewItem == notebook", "group": "context@3" },
+        { "command": "on.deleteNotebook", "when": "viewItem == notebook", "group": "context@4" },
+        { "command": "on.openSource", "when": "viewItem == source", "group": "inline" },
+        { "command": "on.openNote", "when": "viewItem == note", "group": "inline" }
+      ],
+      "explorer/context": [
+        { "command": "on.importFile", "when": "resourceScheme == file", "group": "openNotebook@1" }
+      ],
+      "editor/title/context": [
+        { "command": "on.importFileFromEditor", "when": "resourceScheme == file", "group": "openNotebook" }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "tsc -p ./",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}
