@@ -2,6 +2,9 @@
 
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.85%2B-blue)](https://code.visualstudio.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Open Notebook](https://img.shields.io/badge/powered%20by-Open%20Notebook-orange)](https://github.com/lfnovo/open-notebook)
+
+> 🔌 A companion VS Code extension for [Open Notebook](https://github.com/lfnovo/open-notebook) — the open-source Notebook LM alternative by [lfnovo](https://github.com/lfnovo). This extension is **not** a fork; it is an independent client that communicates with Open Notebook via its REST API.
 
 > 🌐 [中文](#中文) | [English](#english)
 
@@ -171,6 +174,12 @@ src/
 
 ---
 
-## License
+## Attribution / 归属声明
+
+This project is a **companion extension** for [Open Notebook](https://github.com/lfnovo/open-notebook) by [lfnovo](https://github.com/lfnovo) and [contributors](https://github.com/lfnovo/open-notebook/graphs/contributors). Open Notebook is MIT licensed. This extension is an independent work that interacts with Open Notebook solely through its public REST API. No code from Open Notebook is included or modified.
+
+本项目是 [Open Notebook](https://github.com/lfnovo/open-notebook) 的**配套扩展**，由 [lfnovo](https://github.com/lfnovo) 及[贡献者](https://github.com/lfnovo/open-notebook/graphs/contributors)开发。Open Notebook 使用 MIT 协议。本扩展为独立作品，仅通过 Open Notebook 的公开 REST API 进行交互，未包含或修改任何 Open Notebook 代码。
+
+## License / 协议
 
 MIT — see [Open Notebook](https://github.com/lfnovo/open-notebook) for the backend project.
