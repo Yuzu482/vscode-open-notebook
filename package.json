@@ -72,7 +72,8 @@
       { "command": "on.importFileFromEditor", "title": "导入到 Open Notebook" },
       { "command": "on.checkEnv", "title": "环境检测 & 自动构建", "icon": "$(debug-start)" },
       { "command": "on.switchLang", "title": "切换语言", "icon": "$(globe)" },
-      { "command": "on.askAI", "title": "全局 AI 分析", "icon": "$(sparkle)" }
+      { "command": "on.askAI", "title": "全局 AI 分析", "icon": "$(sparkle)" },
+      { "command": "on.setDefaultModel", "title": "设置默认 AI 模型" }
     ],
     "menus": {
       "view/title": [

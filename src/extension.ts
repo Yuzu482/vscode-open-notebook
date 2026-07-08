@@ -392,8 +392,46 @@ export function activate(context: vscode.ExtensionContext) {
                     const regRes = await fetch(`${apiUrl()}/credentials/${cred.id}/register-models`, { method: 'POST' });
                     const regData: any = await regRes.json();
                     vscode.window.showInformationMessage(`✅ ${t('ai.config.success', provider.label, regData?.registered ?? '?')}`);
+
+                    const setDefault = await vscode.window.showQuickPick(
+                        ['是，选择默认模型', '跳过，稍后手动设置'],
+                        { title: '要设置默认 AI 模型吗？' }
+                    );
+                    if (setDefault?.startsWith('是')) { vscode.commands.executeCommand('on.setDefaultModel'); }
                 }
             } catch (e: any) { vscode.window.showErrorMessage(t('ai.config.failed', e.message)); }
+        })
+    );
+
+    // ---- 设置默认模型 ----
+    context.subscriptions.push(
+        vscode.commands.registerCommand('on.setDefaultModel', async () => {
+            try {
+                const modelsRes = await fetch(`${apiUrl()}/models`);
+                const modelsData: any = await modelsRes.json();
+                const models: any[] = modelsData.models || modelsData || [];
+
+                const types = ['chat', 'embedding', 'speech_to_text', 'text_to_speech'];
+                for (const type of types) {
+                    const typedModels = models.filter((m: any) => m.type === type || m.model_type === type);
+                    if (!typedModels.length) { continue; }
+                    const pick = await vscode.window.showQuickPick(
+                        typedModels.map((m: any) => ({
+                            label: m.name || m.id || m.model,
+                            detail: m.provider || '',
+                            model: m,
+                        })),
+                        { title: `选择默认「${type}」模型`, placeHolder: 'Skip 跳过...' }
+                    );
+                    if (pick) {
+                        await fetch(`${apiUrl()}/models/config`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ type, model_id: pick.model.id || pick.model.name }),
+                        });
+                    }
+                }
+                vscode.window.showInformationMessage('✅ 默认模型已设置');
+            } catch (e: any) { vscode.window.showErrorMessage('设置失败: ' + e.message); }
         })
     );
 

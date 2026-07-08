@@ -63,6 +63,15 @@ class NoteNode extends vscode.TreeItem {
     }
 }
 
+class ChatButtonNode extends vscode.TreeItem {
+    constructor() {
+        super('💬 AI 对话', vscode.TreeItemCollapsibleState.None);
+        this.iconPath = new vscode.ThemeIcon('comment-discussion');
+        this.command = { command: 'on.askAI', title: 'AI 对话' };
+        this.tooltip = '点击开始 AI 对话（跨所有笔记本分析）';
+    }
+}
+
 export class NotebookTreeProvider implements vscode.TreeDataProvider<TreeNode> {
     private _onDidChange = new vscode.EventEmitter<TreeNode | undefined>();
     readonly onDidChangeTreeData = this._onDidChange.event;
@@ -73,7 +82,12 @@ export class NotebookTreeProvider implements vscode.TreeDataProvider<TreeNode> {
     getTreeItem(e: TreeNode) { return e; }
 
     async getChildren(e?: TreeNode): Promise<TreeNode[]> {
-        if (!e) { const nbs = await api.listNotebooks(); return nbs.map(n => new NBNote(n)); }
+        if (!e) {
+            const nbs = await api.listNotebooks();
+            const items: TreeNode[] = nbs.map(n => new NBNote(n));
+            items.push(new ChatButtonNode());
+            return items;
+        }
         if (e instanceof NBNote) {
             const [ss, ns] = await Promise.all([api.listSources(e.nb.id), api.listNotes(e.nb.id)]);
             this.sc.set(e.nb.id, ss); this.nc.set(e.nb.id, ns);
