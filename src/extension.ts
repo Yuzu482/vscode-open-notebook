@@ -19,6 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const API = () => getConfig().apiUrl;
     const apiUrl = () => API().endsWith('/api') ? API() : `${API()}/api`;
+    const baseUrl = () => API().replace(/\/api$/, '');  // health check uses base URL
 
     // ---- 虚拟文档 ----
     const contentProvider = new ONContentProvider();

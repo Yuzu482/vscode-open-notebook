@@ -21,10 +21,11 @@ export async function checkDocker(): Promise<boolean> {
 }
 
 export async function checkAPI(apiUrl: string): Promise<boolean> {
+    const base = apiUrl.replace(/\/api$/, '') + '/health';
     try {
         const c = new AbortController();
         const t = setTimeout(() => c.abort(), 3000);
-        const res = await fetch(`${apiUrl}/health`, { signal: c.signal });
+        const res = await fetch(base, { signal: c.signal });
         clearTimeout(t);
         return res.ok;
     } catch { return false; }
