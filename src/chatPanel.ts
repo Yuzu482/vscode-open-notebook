@@ -89,7 +89,11 @@ export class ChatPanel {
                 try {
                     const res = await fetch('http://localhost:5055/api/chat/execute', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ session_id: this._sessionId, message: msg.text }),
+                        body: JSON.stringify({
+                            session_id: this._sessionId,
+                            message: msg.text,
+                            context: { notebook_id: this._notebookId },
+                        }),
                     });
                     const data: any = await res.json();
                     this._panel.webview.postMessage({
