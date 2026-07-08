@@ -4,6 +4,7 @@
   "description": "通过 REST API 在 VS Code 中原生操作 Open Notebook。支持中文/英文，自动检测 Docker 环境。",
   "version": "2.0.0",
   "publisher": "local",
+  "repository": { "type": "git", "url": "https://github.com/Yuzu482/vscode-open-notebook" },
   "engines": { "vscode": "^1.85.0" },
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
@@ -70,7 +71,8 @@
       { "command": "on.importFile", "title": "导入文件到笔记本" },
       { "command": "on.importFileFromEditor", "title": "导入到 Open Notebook" },
       { "command": "on.checkEnv", "title": "环境检测 & 自动构建", "icon": "$(debug-start)" },
-      { "command": "on.switchLang", "title": "切换语言", "icon": "$(globe)" }
+      { "command": "on.switchLang", "title": "切换语言", "icon": "$(globe)" },
+      { "command": "on.askAI", "title": "全局 AI 分析", "icon": "$(sparkle)" }
     ],
     "menus": {
       "view/title": [
@@ -80,7 +82,8 @@
         { "command": "on.configureAI", "when": "view == onNotebooks", "group": "navigation" },
         { "command": "on.importCurrentFile", "when": "view == onNotebooks", "group": "navigation" },
         { "command": "on.checkEnv", "when": "view == onNotebooks", "group": "navigation@99" },
-        { "command": "on.switchLang", "when": "view == onNotebooks", "group": "navigation@100" }
+        { "command": "on.switchLang", "when": "view == onNotebooks", "group": "navigation@100" },
+        { "command": "on.askAI", "when": "view == onNotebooks", "group": "navigation@50" }
       ],
       "view/item/context": [
         { "command": "on.openNotebook", "when": "viewItem == notebook", "group": "inline" },

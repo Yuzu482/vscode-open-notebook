@@ -328,6 +328,67 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // ---- 全局 AI 分析（跨所有笔记本） ----
+    context.subscriptions.push(
+        vscode.commands.registerCommand('on.askAI', async () => {
+            const question = await vscode.window.showInputBox({
+                title: '🤖 全局 AI 分析', prompt: 'AI 将访问所有笔记本的资料和笔记',
+                placeHolder: '例如：总结所有研究的共性发现...',
+                ignoreFocusOut: true,
+            });
+            if (!question) { return; }
+
+            chatChannel.clear();
+            chatChannel.show(true);
+            chatChannel.appendLine(`╔══════════════════════════════════╗`);
+            chatChannel.appendLine(`║  🤖 全局分析`);
+            chatChannel.appendLine(`╚══════════════════════════════════╝`);
+            chatChannel.appendLine(`\n🧑 ${t('chat.you')}: ${question}\n`);
+
+            const thinking = vscode.window.createQuickPick();
+            thinking.title = '🤖 全局分析';
+            thinking.placeholder = '正在搜索并分析所有笔记本...';
+            thinking.busy = true;
+            thinking.show();
+
+            try {
+                const res = await fetch(`${apiUrl()}/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question }),
+                });
+                thinking.hide();
+
+                if (!res.ok) {
+                    chatChannel.appendLine(`❌ 分析失败: HTTP ${res.status}\n`);
+                    return;
+                }
+
+                const text = await res.text();
+                const lines = text.split('\n');
+                let finalAnswer = '';
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const event = JSON.parse(line.slice(6));
+                            if (event.type === 'answer') {
+                                chatChannel.appendLine(event.content || event.answer || '');
+                            } else if (event.type === 'final_answer') {
+                                finalAnswer = event.content || event.answer || '';
+                            }
+                        } catch { /* skip */ }
+                    }
+                }
+                if (finalAnswer) { chatChannel.appendLine(`\n📌 ${finalAnswer}\n`); }
+                chatChannel.appendLine('\n──────────────────────────────────');
+                chatChannel.appendLine('💡 右键笔记本 → AI 对话，可针对单个笔记本深入提问\n');
+            } catch (e: any) {
+                thinking.hide();
+                chatChannel.appendLine(`❌ ${t('chat.error', e.message)}\n`);
+            }
+        })
+    );
+
     // ---- 搜索 ----
     context.subscriptions.push(
         vscode.commands.registerCommand('on.search', async () => {
