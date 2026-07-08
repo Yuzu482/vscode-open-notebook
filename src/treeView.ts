@@ -65,10 +65,17 @@ class NoteNode extends vscode.TreeItem {
 
 class ChatButtonNode extends vscode.TreeItem {
     constructor() {
-        super('💬 AI 对话', vscode.TreeItemCollapsibleState.None);
+        super('💬 与 AI 对话', vscode.TreeItemCollapsibleState.None);
         this.iconPath = new vscode.ThemeIcon('comment-discussion');
-        this.command = { command: 'on.askAI', title: 'AI 对话' };
-        this.tooltip = '点击开始 AI 对话（跨所有笔记本分析）';
+        this.command = { command: 'on.askAI', title: '' };
+        this.tooltip = 'AI 将搜索所有笔记本的资料和笔记来回答你的问题';
+    }
+}
+
+class SeparatorNode extends vscode.TreeItem {
+    constructor() {
+        super('', vscode.TreeItemCollapsibleState.None);
+        this.description = '───  ───  ───';
     }
 }
 
@@ -85,6 +92,7 @@ export class NotebookTreeProvider implements vscode.TreeDataProvider<TreeNode> {
         if (!e) {
             const nbs = await api.listNotebooks();
             const items: TreeNode[] = nbs.map(n => new NBNote(n));
+            if (nbs.length) { items.push(new SeparatorNode()); }
             items.push(new ChatButtonNode());
             return items;
         }

@@ -397,16 +397,20 @@ export function activate(context: vscode.ExtensionContext) {
                             name: m.name, provider: m.provider || provider.provider,
                             model_type: m.model_type || 'chat',
                         }));
-                        await fetch(`${apiUrl()}/credentials/${cred.id}/register-models`, {
+                        const regRes = await fetch(`${apiUrl()}/credentials/${cred.id}/register-models`, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ models }),
                         });
+                        // Fetch registered models to get their IDs
+                        const allModels: any = await (await fetch(`${apiUrl()}/models`)).json();
+                        const chatModels = (allModels?.value || allModels?.models || []).filter((m: any) => m.type === 'chat');
+                        if (chatModels.length) {
+                            await fetch(`${apiUrl()}/models/defaults`, {
+                                method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ default_chat_model: chatModels[0].id }),
+                            });
+                        }
                     }
-                    // Auto assign defaults
-                    await fetch(`${apiUrl()}/models/defaults`, {
-                        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ default_chat_model: discovered[0]?.name }),
-                    });
                     vscode.window.showInformationMessage(`✅ ${provider.label} 已配置 (${discovered.length} 个模型)`);
 
                     const setDefault = await vscode.window.showQuickPick(
@@ -434,15 +438,16 @@ export function activate(context: vscode.ExtensionContext) {
                     const pick = await vscode.window.showQuickPick(
                         typedModels.map((m: any) => ({
                             label: m.name || m.id || m.model,
-                            detail: m.provider || '',
+                            detail: `${m.provider || ''} (${m.id})`,
                             model: m,
                         })),
                         { title: `选择默认「${type}」模型`, placeHolder: 'Skip 跳过...' }
                     );
                     if (pick) {
+                        const fieldName = `default_${type}_model`;
                         await fetch(`${apiUrl()}/models/defaults`, {
                             method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ [`default_${type}_model`]: pick.model.id || pick.model.name }),
+                            body: JSON.stringify({ [fieldName]: pick.model.id }),
                         });
                     }
                 }
