@@ -387,11 +387,27 @@ export function activate(context: vscode.ExtensionContext) {
                 });
                 const cred: any = await res.json();
                 if (cred.id) {
-                    vscode.window.showInformationMessage(t('ai.config.discovering', provider.label));
                     await fetch(`${apiUrl()}/credentials/${cred.id}/discover`, { method: 'POST' });
-                    const regRes = await fetch(`${apiUrl()}/credentials/${cred.id}/register-models`, { method: 'POST' });
-                    const regData: any = await regRes.json();
-                    vscode.window.showInformationMessage(`✅ ${t('ai.config.success', provider.label, regData?.registered ?? '?')}`);
+                    const discRes = await fetch(`${apiUrl()}/credentials/${cred.id}/discover`, { method: 'POST' });
+                    const discData: any = await discRes.json();
+                    const discovered: any[] = discData?.discovered || [];
+
+                    if (discovered.length) {
+                        const models = discovered.map((m: any) => ({
+                            name: m.name, provider: m.provider || provider.provider,
+                            model_type: m.model_type || 'chat',
+                        }));
+                        await fetch(`${apiUrl()}/credentials/${cred.id}/register-models`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ models }),
+                        });
+                    }
+                    // Auto assign defaults
+                    await fetch(`${apiUrl()}/models/defaults`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ default_chat_model: discovered[0]?.name }),
+                    });
+                    vscode.window.showInformationMessage(`✅ ${provider.label} 已配置 (${discovered.length} 个模型)`);
 
                     const setDefault = await vscode.window.showQuickPick(
                         ['是，选择默认模型', '跳过，稍后手动设置'],
@@ -424,9 +440,9 @@ export function activate(context: vscode.ExtensionContext) {
                         { title: `选择默认「${type}」模型`, placeHolder: 'Skip 跳过...' }
                     );
                     if (pick) {
-                        await fetch(`${apiUrl()}/models/config`, {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ type, model_id: pick.model.id || pick.model.name }),
+                        await fetch(`${apiUrl()}/models/defaults`, {
+                            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ [`default_${type}_model`]: pick.model.id || pick.model.name }),
                         });
                     }
                 }

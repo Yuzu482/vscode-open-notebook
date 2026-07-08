@@ -159,6 +159,7 @@ pre code{padding:0;background:none}
   <button id="sendBtn">Send</button>
 </div>
 <script>
+(function() {
 const vscode = acquireVsCodeApi();
 const messages = document.getElementById('messages');
 const input = document.getElementById('input');
@@ -175,7 +176,7 @@ function addMessage(role, text) {
     messages.scrollTop = messages.scrollHeight;
 }
 
-function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>'); }
+function escapeHtml(s) { return (''+s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>'); }
 
 function doSend() {
     if (sending) return;
@@ -190,14 +191,26 @@ function doSend() {
     vscode.postMessage({ type: 'send', text, mode });
 }
 
-input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); doSend(); }
-});
+// Use a single listener with stopImmediatePropagation
+let listenerAdded = false;
+if (!listenerAdded) {
+    listenerAdded = true;
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            doSend();
+            return false;
+        }
+    }, true);
+}
+
 input.addEventListener('input', function() {
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 120) + 'px';
 });
-sendBtn.addEventListener('click', function() { doSend(); });
+sendBtn.addEventListener('click', function(e) { e.preventDefault(); doSend(); });
 
 window.addEventListener('message', function(e) {
     if (e.data.type === 'msg') {
@@ -211,6 +224,7 @@ window.addEventListener('message', function(e) {
 });
 
 input.focus();
+})();
 </script></body></html>`;
     }
 }
