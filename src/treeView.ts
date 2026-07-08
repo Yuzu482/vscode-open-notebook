@@ -3,43 +3,35 @@ import * as api from './api';
 import { t } from './i18n';
 
 export class ONContentProvider implements vscode.TextDocumentContentProvider {
-    private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
-    readonly onDidChange = this._onDidChange.event;
-
+    private _e = new vscode.EventEmitter<vscode.Uri>();
+    readonly onDidChange = this._e.event;
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
-        const [_, type, id] = uri.path.split('/');
+        const [, type, id] = uri.path.split('/');
         try {
-            if (type === 'source') {
-                const s = await api.getSource(id);
-                return `# ${s.title || 'Untitled Source'}\n\nType: ${s.content_type || 'unknown'} | Status: ${s.status || 'ready'}\n\n---\n\n${s.content || '(No content)'}`;
-            }
-            if (type === 'note') {
-                const n = await api.getNote(id);
-                return n.content || '(Empty note)';
-            }
+            if (type === 'source') { const s = await api.getSource(id); return `# ${s.title || 'Source'}\n\n${s.content || ''}`; }
+            if (type === 'note') { const n = await api.getNote(id); return n.content || ''; }
         } catch (e: any) { return `Error: ${e.message}`; }
-        return 'Unknown';
+        return '';
     }
-    refresh(uri?: vscode.Uri) { this._onDidChange.fire(uri || vscode.Uri.parse('opennotebook:///')); }
+    refresh(u?: vscode.Uri) { this._e.fire(u || vscode.Uri.parse('opennotebook:///')); }
 }
 
-type TreeNode = NBNote | SrcFolder | SrcNode | NoteFolder | NoteNode;
+type TN = NBN | SF | SN | NF | NN;
 
-class NBNote extends vscode.TreeItem {
+class NBN extends vscode.TreeItem {
     constructor(public nb: api.Notebook) {
         super(nb.name, vscode.TreeItemCollapsibleState.Collapsed);
         this.id = nb.id; this.contextValue = 'notebook';
         this.iconPath = new vscode.ThemeIcon('notebook');
-        this.description = nb.archived ? '(archived)' : '';
     }
 }
-class SrcFolder extends vscode.TreeItem {
+class SF extends vscode.TreeItem {
     constructor(nbId: string, n: number) {
         super(t('tree.sources', n), vscode.TreeItemCollapsibleState.Collapsed);
-        this.id = nbId + '::src'; this.iconPath = new vscode.ThemeIcon('folder-library');
+        this.id = nbId + '::s'; this.iconPath = new vscode.ThemeIcon('folder-library');
     }
 }
-class SrcNode extends vscode.TreeItem {
+class SN extends vscode.TreeItem {
     constructor(public src: api.Source) {
         super(src.title || src.id, vscode.TreeItemCollapsibleState.None);
         this.id = src.id; this.contextValue = 'source';
@@ -48,13 +40,13 @@ class SrcNode extends vscode.TreeItem {
         this.command = { command: 'on.openSource', title: '', arguments: [src] };
     }
 }
-class NoteFolder extends vscode.TreeItem {
+class NF extends vscode.TreeItem {
     constructor(nbId: string, n: number) {
         super(t('tree.notes', n), vscode.TreeItemCollapsibleState.Collapsed);
-        this.id = nbId + '::notes'; this.iconPath = new vscode.ThemeIcon('edit');
+        this.id = nbId + '::n'; this.iconPath = new vscode.ThemeIcon('edit');
     }
 }
-class NoteNode extends vscode.TreeItem {
+class NN extends vscode.TreeItem {
     constructor(public note: api.Note) {
         super(note.title || 'Untitled', vscode.TreeItemCollapsibleState.None);
         this.id = note.id; this.contextValue = 'note';
@@ -63,46 +55,24 @@ class NoteNode extends vscode.TreeItem {
     }
 }
 
-class ChatButtonNode extends vscode.TreeItem {
-    constructor() {
-        super('💬 与 AI 对话', vscode.TreeItemCollapsibleState.None);
-        this.iconPath = new vscode.ThemeIcon('comment-discussion');
-        this.command = { command: 'on.askAI', title: '' };
-        this.tooltip = 'AI 将搜索所有笔记本的资料和笔记来回答你的问题';
-    }
-}
-
-class SeparatorNode extends vscode.TreeItem {
-    constructor() {
-        super('', vscode.TreeItemCollapsibleState.None);
-        this.description = '───  ───  ───';
-    }
-}
-
-export class NotebookTreeProvider implements vscode.TreeDataProvider<TreeNode> {
-    private _onDidChange = new vscode.EventEmitter<TreeNode | undefined>();
-    readonly onDidChangeTreeData = this._onDidChange.event;
+export class NotebookTreeProvider implements vscode.TreeDataProvider<TN> {
+    private _e = new vscode.EventEmitter<TN | undefined>();
+    readonly onDidChangeTreeData = this._e.event;
     private sc = new Map<string, api.Source[]>();
     private nc = new Map<string, api.Note[]>();
 
-    refresh() { this.sc.clear(); this.nc.clear(); this._onDidChange.fire(undefined); }
-    getTreeItem(e: TreeNode) { return e; }
+    refresh() { this.sc.clear(); this.nc.clear(); this._e.fire(undefined); }
+    getTreeItem(e: TN) { return e; }
 
-    async getChildren(e?: TreeNode): Promise<TreeNode[]> {
-        if (!e) {
-            const nbs = await api.listNotebooks();
-            const items: TreeNode[] = nbs.map(n => new NBNote(n));
-            if (nbs.length) { items.push(new SeparatorNode()); }
-            items.push(new ChatButtonNode());
-            return items;
-        }
-        if (e instanceof NBNote) {
+    async getChildren(e?: TN): Promise<TN[]> {
+        if (!e) { return (await api.listNotebooks()).map(n => new NBN(n)); }
+        if (e instanceof NBN) {
             const [ss, ns] = await Promise.all([api.listSources(e.nb.id), api.listNotes(e.nb.id)]);
             this.sc.set(e.nb.id, ss); this.nc.set(e.nb.id, ns);
-            return [new SrcFolder(e.nb.id, ss.length), new NoteFolder(e.nb.id, ns.length)];
+            return [new SF(e.nb.id, ss.length), new NF(e.nb.id, ns.length)];
         }
-        if (e instanceof SrcFolder) { return (this.sc.get(e.id!.split('::')[0]) || []).map(s => new SrcNode(s)); }
-        if (e instanceof NoteFolder) { return (this.nc.get(e.id!.split('::')[0]) || []).map(n => new NoteNode(n)); }
+        if (e instanceof SF) { return (this.sc.get(e.id!.split('::')[0]) || []).map(s => new SN(s)); }
+        if (e instanceof NF) { return (this.nc.get(e.id!.split('::')[0]) || []).map(n => new NN(n)); }
         return [];
     }
 }
