@@ -63,16 +63,21 @@ export class ChatPanel {
 
     private async _handleMessage(msg: any) {
         if (msg.type === 'send') {
-            // Show user message
             this._panel.webview.postMessage({ type: 'msg', role: 'user', text: msg.text });
 
             if (msg.mode === 'global') {
-                // Global ask
                 try {
                     const res = await fetch('http://localhost:5055/api/ask', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ question: msg.text }),
                     });
+                    if (!res.ok) {
+                        const err: any = await res.json().catch(() => ({}));
+                        const detail = typeof err.detail === 'string' ? err.detail : JSON.stringify(err);
+                        this._panel.webview.postMessage({ type: 'msg', role: 'ai', text: `❌ ${detail}\n\n请在浏览器打开 http://localhost:8502 → Models 配置 AI 模型，或点击侧边栏 🔑 配置 AI。` });
+                        this._panel.webview.postMessage({ type: 'done' });
+                        return;
+                    }
                     const text = await res.text();
                     let answer = '';
                     for (const line of text.split('\n')) {
@@ -85,7 +90,6 @@ export class ChatPanel {
                     this._panel.webview.postMessage({ type: 'msg', role: 'ai', text: `Error: ${e.message}` });
                 }
             } else {
-                // Per-notebook chat
                 try {
                     const res = await fetch('http://localhost:5055/api/chat/execute', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -96,14 +100,17 @@ export class ChatPanel {
                         }),
                     });
                     const data: any = await res.json();
-                    this._panel.webview.postMessage({
-                        type: 'msg', role: 'ai',
-                        text: data.response || data.answer || JSON.stringify(data)
-                    });
+                    if (data.detail) {
+                        const detail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+                        this._panel.webview.postMessage({ type: 'msg', role: 'ai', text: `❌ ${detail}\n\n请在浏览器打开 http://localhost:8502 → Models 配置 AI 模型，或点击侧边栏 🔑 配置 AI。` });
+                    } else {
+                        this._panel.webview.postMessage({ type: 'msg', role: 'ai', text: data.response || data.answer || JSON.stringify(data) });
+                    }
                 } catch (e: any) {
                     this._panel.webview.postMessage({ type: 'msg', role: 'ai', text: `Error: ${e.message}` });
                 }
             }
+            this._panel.webview.postMessage({ type: 'done' });
         }
     }
 
@@ -157,6 +164,7 @@ const messages = document.getElementById('messages');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('sendBtn');
 let firstMsg = true;
+let sending = false;
 
 function addMessage(role, text) {
     if (firstMsg) { messages.innerHTML = ''; firstMsg = false; }
@@ -169,9 +177,11 @@ function addMessage(role, text) {
 
 function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>'); }
 
-function send() {
+function doSend() {
+    if (sending) return;
     const text = input.value.trim();
     if (!text) return;
+    sending = true;
     addMessage('user', text);
     input.value = '';
     input.style.height = 'auto';
@@ -180,17 +190,21 @@ function send() {
     vscode.postMessage({ type: 'send', text, mode });
 }
 
-input.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); doSend(); }
 });
-input.addEventListener('input', () => {
+input.addEventListener('input', function() {
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 120) + 'px';
 });
+sendBtn.addEventListener('click', function() { doSend(); });
 
-window.addEventListener('message', e => {
+window.addEventListener('message', function(e) {
     if (e.data.type === 'msg') {
         addMessage(e.data.role, e.data.text);
+    }
+    if (e.data.type === 'done') {
+        sending = false;
         sendBtn.disabled = false;
         input.focus();
     }
