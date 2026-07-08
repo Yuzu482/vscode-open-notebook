@@ -46,7 +46,16 @@ export function activate(context: vscode.ExtensionContext) {
         statusBar.tooltip = ok ? t('status.tooltip.on') : t('status.tooltip.off');
         statusBar.show();
     }
-    updateStatus();
+    // 首次连接带重试（Docker 可能还没完全启动）
+    async function initStatus() {
+        for (let i = 0; i < 10; i++) {
+            const ok = await checkAPI(apiUrl());
+            if (ok) { break; }
+            await sleep(3000);
+        }
+        updateStatus();
+    }
+    initStatus();
     const si = setInterval(updateStatus, 30000);
     context.subscriptions.push({ dispose: () => clearInterval(si) });
 
