@@ -1,29 +1,13 @@
 import * as vscode from 'vscode';
 
-let modelCache: { id: string; name: string; type: string; provider: string }[] = [];
-let defaultsCache: any = {};
-
-async function ensureModels() {
-    if (modelCache.length) return;
-    try {
-        const [mRes, dRes] = await Promise.all([
-            fetch('http://localhost:5055/api/models'),
-            fetch('http://localhost:5055/api/models/defaults'),
-        ]);
-        const mData: any = await mRes.json();
-        modelCache = (mData.value || mData.models || []);
-        defaultsCache = await dRes.json();
-    } catch { }
-}
-
 export class ChatPanel {
     public static current: ChatPanel | undefined;
-    private readonly _panel: vscode.WebviewPanel;
+    readonly _panel: vscode.WebviewPanel;
     private _sessionId = '';
     private _notebookId = '';
     private _mode: 'local' | 'global';
 
-    private constructor(p: vscode.WebviewPanel, nbId: string, nbName: string, mode: 'local' | 'global') {
+    private constructor(p: vscode.WebviewPanel, nbId: string, mode: 'local' | 'global') {
         this._panel = p;
         this._notebookId = nbId;
         this._mode = mode;
@@ -32,11 +16,16 @@ export class ChatPanel {
     }
 
     static async createOrShow(nbId: string, nbName: string) {
-        if (ChatPanel.current) { ChatPanel.current._panel.reveal(vscode.ViewColumn.Two); return ChatPanel.current; }
-        const p = vscode.window.createWebviewPanel('onChat', `💬 ${nbName}`,
+        if (ChatPanel.current) {
+            ChatPanel.current._panel.reveal(vscode.ViewColumn.Two);
+            return ChatPanel.current;
+        }
+        const p = vscode.window.createWebviewPanel(
+            'onChat', `💬 ${nbName}`,
             { viewColumn: vscode.ViewColumn.Two, preserveFocus: true },
-            { enableScripts: true, retainContextWhenHidden: true });
-        ChatPanel.current = new ChatPanel(p, nbId, nbName, 'local');
+            { enableScripts: true, retainContextWhenHidden: true }
+        );
+        ChatPanel.current = new ChatPanel(p, nbId, 'local');
         p.webview.html = ChatPanel._html();
         try {
             const r = await fetch('http://localhost:5055/api/chat/sessions', {
@@ -50,13 +39,36 @@ export class ChatPanel {
     }
 
     static async createGlobal() {
-        if (ChatPanel.current) { ChatPanel.current._panel.reveal(vscode.ViewColumn.Two); return ChatPanel.current; }
-        const p = vscode.window.createWebviewPanel('onChat', '🤖 Global Analysis',
+        if (ChatPanel.current) {
+            ChatPanel.current._panel.reveal(vscode.ViewColumn.Two);
+            return ChatPanel.current;
+        }
+        // Find first notebook for global chat session
+        let nbId = '';
+        try {
+            const nr = await fetch('http://localhost:5055/api/notebooks');
+            const nd: any = await nr.json();
+            nbId = (nd.value || [])[0]?.id || '';
+        } catch { }
+
+        const p = vscode.window.createWebviewPanel(
+            'onChat', '🤖 Global Analysis',
             { viewColumn: vscode.ViewColumn.Two, preserveFocus: true },
-            { enableScripts: true, retainContextWhenHidden: true });
-        ChatPanel.current = new ChatPanel(p, '', 'Global', 'global');
-        await ensureModels();
+            { enableScripts: true, retainContextWhenHidden: true }
+        );
+        ChatPanel.current = new ChatPanel(p, nbId, 'global');
         p.webview.html = ChatPanel._html();
+
+        if (nbId) {
+            try {
+                const r = await fetch('http://localhost:5055/api/chat/sessions', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notebook_id: nbId }),
+                });
+                const d: any = await r.json();
+                ChatPanel.current._sessionId = d.id || '';
+            } catch { }
+        }
         return ChatPanel.current;
     }
 
@@ -66,48 +78,27 @@ export class ChatPanel {
         if (msg.type !== 'send') return;
         this._panel.webview.postMessage({ type: 'msg', role: 'user', text: msg.text });
 
-        if (this._mode === 'global') {
-            await ensureModels();
-            const chatModel = defaultsCache.default_chat_model || (modelCache.find(m => m.type === 'chat')?.id) || '';
-            try {
-                const r = await fetch('http://localhost:5055/api/search/ask/simple', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        question: msg.text,
-                        strategy_model: chatModel,
-                        answer_model: chatModel,
-                        final_answer_model: chatModel,
-                    }),
-                });
-                const text = await r.text();
-                let answer = '';
-                for (const line of text.split('\n')) {
-                    if (line.startsWith('data: ')) {
-                        try { const e = JSON.parse(line.slice(6)); answer = e.content || e.answer || e.final_answer || answer; } catch { }
-                    }
-                }
-                if (!answer && text) {
-                    try { const j = JSON.parse(text); answer = j.response || j.answer || text.slice(0, 500); } catch { answer = text.slice(0, 500); }
-                }
-                this._panel.webview.postMessage({ type: 'msg', role: 'ai', text: answer || 'No response' });
-            } catch (e: any) {
-                this._panel.webview.postMessage({ type: 'msg', role: 'ai', text: `Error: ${e.message}` });
+        // Both local and global now use chat/execute (no /ask endpoint needed)
+        try {
+            const r = await fetch('http://localhost:5055/api/chat/execute', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: this._sessionId,
+                    message: this._mode === 'global'
+                        ? `[跨笔记本全局分析] ${msg.text}`
+                        : msg.text,
+                    context: { notebook_id: this._notebookId },
+                }),
+            });
+            const d: any = await r.json();
+            if (d.detail) {
+                const err = typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
+                this._panel.webview.postMessage({ type: 'msg', role: 'ai', text: `❌ ${err}\n\n请点击侧边栏 🔑 配置 AI 模型` });
+            } else {
+                this._panel.webview.postMessage({ type: 'msg', role: 'ai', text: d.response || d.answer || JSON.stringify(d) });
             }
-        } else {
-            try {
-                const r = await fetch('http://localhost:5055/api/chat/execute', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session_id: this._sessionId, message: msg.text, context: { notebook_id: this._notebookId } }),
-                });
-                const d: any = await r.json();
-                if (d.detail) {
-                    this._panel.webview.postMessage({ type: 'msg', role: 'ai', text: `❌ ${typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail)}\n\n请点击底部 🟢 按钮配置 AI` });
-                } else {
-                    this._panel.webview.postMessage({ type: 'msg', role: 'ai', text: d.response || d.answer || JSON.stringify(d) });
-                }
-            } catch (e: any) {
-                this._panel.webview.postMessage({ type: 'msg', role: 'ai', text: `Error: ${e.message}` });
-            }
+        } catch (e: any) {
+            this._panel.webview.postMessage({ type: 'msg', role: 'ai', text: `Error: ${e.message}` });
         }
         this._panel.webview.postMessage({ type: 'done' });
     }
@@ -133,34 +124,38 @@ body{display:flex;flex-direction:column;height:100vh;font-family:var(--vscode-fo
 #bar button:disabled{opacity:.5}
 .em{text-align:center;color:var(--vscode-descriptionForeground);font-size:14px;padding:60px 20px}
 .em .ic{font-size:40px;margin-bottom:12px}
-</style></head><body data-init="1">
-<div id="msgs"><div class="em"><div class="ic">💬</div><div>向 AI 提问，它将搜索你的所有资料和笔记。</div></div></div>
+</style></head><body>
+<div id="msgs"><div class="em"><div class="ic">💬</div><div>向 AI 提问，它将基于你的资料和笔记来回答。</div></div></div>
 <div id="bar"><textarea id="tx" rows="1" placeholder="输入消息... (Enter 发送)"></textarea><button id="bt">发送</button></div>
 <script>
-if(document.body.getAttribute('data-init')==='1'){
-document.body.setAttribute('data-init','2');
 (function(){
-var v=acquireVsCodeApi(),ms=document.getElementById('msgs'),tx=document.getElementById('tx'),bt=document.getElementById('bt'),first=true,sending=false;
+if(window.__onChatInit)return;
+window.__onChatInit=1;
+var v=acquireVsCodeApi(),ms=document.getElementById('msgs'),tx=document.getElementById('tx'),bt=document.getElementById('bt'),first=true,sending=false,lastSend=0;
 function add(r,t){
  if(first){ms.innerHTML='';first=false}
  var d=document.createElement('div');d.className='m '+(r==='user'?'u':'a');
  d.innerHTML='<div class="r">'+(r==='user'?'You':'AI')+'</div><div class="b">'+String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>')+'</div>';
  ms.appendChild(d);ms.scrollTop=ms.scrollHeight;
 }
-function send(){
- if(sending)return;var t=tx.value.trim();if(!t)return;
- sending=true;add('user',t);tx.value='';tx.style.height='auto';bt.disabled=true;
+function doSend(){
+ var now=Date.now();
+ if(sending||now-lastSend<800)return;
+ var t=tx.value.trim();if(!t)return;
+ sending=true;lastSend=now;
+ add('user',t);tx.value='';tx.style.height='auto';bt.disabled=true;
  v.postMessage({type:'send',text:t});
 }
-tx.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.stopPropagation();send()}});
-tx.addEventListener('input',function(){tx.style.height='auto';tx.style.height=Math.min(tx.scrollHeight,120)+'px'});
-bt.addEventListener('click',function(){send()});
+tx.onkeypress=function(e){
+ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.stopPropagation();doSend();return false}
+};
+tx.oninput=function(){tx.style.height='auto';tx.style.height=Math.min(tx.scrollHeight,120)+'px'};
+bt.onclick=function(e){e.preventDefault();doSend()};
 window.addEventListener('message',function(e){
  if(e.data.type==='msg')add(e.data.role,e.data.text);
  if(e.data.type==='done'){sending=false;bt.disabled=false;tx.focus()}
 });
 })();
-}
 </script></body></html>`;
     }
 }
