@@ -82,7 +82,7 @@ export class ChatPanel {
     }
 
     static html(): string {
-        return String.raw`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+        return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{display:flex;flex-direction:column;height:100vh;font-family:var(--vscode-font-family);background:var(--vscode-editor-background);color:var(--vscode-foreground)}
 #msgs{flex:1;overflow-y:auto;padding:16px}
@@ -93,27 +93,23 @@ body{display:flex;flex-direction:column;height:100vh;font-family:var(--vscode-fo
 .m .b{padding:10px 14px;border-radius:14px;line-height:1.55;font-size:13px;white-space:pre-wrap;word-break:break-word}
 .m.u .b{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border-bottom-right-radius:4px}
 .m.a .b{background:var(--vscode-input-background);border:1px solid var(--vscode-input-border);border-bottom-left-radius:4px}
-#bar{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--vscode-panel-border);background:var(--vscode-editor-inactiveSelectionBackground)}
-#bar textarea{flex:1;padding:10px 14px;border:1px solid var(--vscode-input-border);border-radius:20px;background:var(--vscode-input-background);color:var(--vscode-input-foreground);font-family:inherit;font-size:13px;resize:none;min-height:40px;max-height:120px;outline:none}
-#bar textarea:focus{border-color:var(--vscode-focusBorder)}
-#bar button{padding:8px 18px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:20px;cursor:pointer;font-size:13px;font-weight:500}
-#bar button:hover{background:var(--vscode-button-hoverBackground)}
-#bar button:disabled{opacity:.5}
-.em{text-align:center;color:var(--vscode-descriptionForeground);font-size:14px;padding:60px 20px}
-.em .ic{font-size:40px;margin-bottom:12px}
+#b{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--vscode-panel-border);background:var(--vscode-editor-inactiveSelectionBackground)}
+#b textarea{flex:1;padding:10px 14px;border:1px solid var(--vscode-input-border);border-radius:20px;background:var(--vscode-input-background);color:var(--vscode-input-foreground);font-family:inherit;font-size:13px;resize:none;min-height:40px;max-height:120px;outline:none}
+#b button{width:70px;padding:8px 0;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:20px;cursor:pointer;font-size:13px;font-weight:600;flex-shrink:0}
+#b button:hover{background:var(--vscode-button-hoverBackground)}
+#b button:disabled{opacity:.5}
+.e{text-align:center;color:var(--vscode-descriptionForeground);font-size:14px;padding:60px 20px}
+.e svg{font-size:40px;margin-bottom:12px}
 </style></head><body>
-<div id="msgs"><div class="em"><div class="ic">💬</div><div>Ask AI anything about your research.</div></div></div>
-<div id="bar"><textarea id="tx" rows="1" placeholder="Type message... (Enter)"></textarea><button id="bt">Send</button></div>
+<div id="msgs"><div class="e">💬<br>Ask AI anything about your research.</div></div>
+<div id="b"><textarea id="tx" rows="1" placeholder="Type message..."></textarea><button id="bt">Send</button></div>
 <script>
-(function(){
-if(window.__onChatInit)return;window.__onChatInit=1;
-var v=acquireVsCodeApi(),ms=document.getElementById('msgs'),tx=document.getElementById('tx'),bt=document.getElementById('bt'),first=true,sending=false,lastTime=0;
+(function(){if(window._x)return;window._x=1;
+var v=acquireVsCodeApi(),ms=document.getElementById('msgs'),tx=document.getElementById('tx'),bt=document.getElementById('bt'),first=true,sending=false;
 function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
 function add(r,t){if(first){ms.innerHTML='';first=false}var d=document.createElement('div');d.className='m '+(r==='user'?'u':'a');d.innerHTML='<div class="l">'+(r==='user'?'You':'AI')+'</div><div class="b">'+esc(t)+'</div>';ms.appendChild(d);ms.scrollTop=ms.scrollHeight;}
-function doSend(){var n=Date.now();if(sending||n-lastTime<800)return;lastTime=n;var t=tx.value.trim();if(!t)return;sending=true;add('user',t);tx.value='';tx.style.height='auto';bt.disabled=true;v.postMessage({type:'send',text:t});}
-tx.onkeydown=function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.stopPropagation();doSend();return false;}};
+bt.onclick=function(){if(sending)return;var t=tx.value.trim();if(!t)return;sending=true;add('user',t);tx.value='';tx.style.height='auto';bt.disabled=true;v.postMessage({type:'send',text:t});};
 tx.oninput=function(){tx.style.height='auto';tx.style.height=Math.min(tx.scrollHeight,120)+'px';};
-bt.onclick=function(){doSend();};
 window.addEventListener('message',function(e){if(e.data.type==='msg')add(e.data.role,e.data.text);if(e.data.type==='done'){sending=false;bt.disabled=false;tx.focus();}});
 })();
 </script></body></html>`;
